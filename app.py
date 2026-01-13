@@ -1,121 +1,49 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import joblib
 
-# =====================================
-# LOAD MODEL & METADATA
-# =====================================
-model = joblib.load("model.pkl")
-columns = joblib.load("columns.pkl")
+# ==============================
+# Load model & metadata
+# ==============================
+model = joblib.load("model.pkl")      # model nhẹ (<100MB) hoặc retrain nhỏ
+columns = joblib.load("columns.pkl")  # danh sách cột
 
-# =====================================
-# STREAMLIT CONFIG
-# =====================================
-st.set_page_config(
-    page_title="Hotel Booking Cancellation Prediction",
-    page_icon="🏨",
-    layout="centered"
-)
+st.set_page_config(page_title="Hotel Booking Cancellation", layout="centered")
 
-st.title("🏨 Dự đoán khả năng hủy đặt phòng")
-st.markdown(
-    "Ứng dụng dự đoán **khả năng khách hàng hủy đặt phòng** dựa trên mô hình Random Forest."
-)
+st.title("🏨 Hotel Booking Cancellation Prediction")
+st.write("Dự đoán khả năng **hủy đặt phòng khách sạn**")
 
-st.divider()
+# ==============================
+# Input form
+# ==============================
+with st.form("booking_form"):
+    lead_time = st.number_input("Lead time (days)", 0, 500, 50)
+    adr = st.number_input("ADR (Average Daily Rate)", 0.0, 500.0, 100.0)
+    total_special_requests = st.slider("Total special requests", 0, 5, 1)
+    previous_cancellations = st.slider("Previous cancellations", 0, 10, 0)
 
-# =====================================
-# INPUT FORM
-# =====================================
-st.subheader("📋 Nhập thông tin đặt phòng")
+    submit = st.form_submit_button("Predict")
 
-lead_time = st.number_input(
-    "Lead time (số ngày từ lúc đặt đến ngày nhận phòng)",
-    min_value=0,
-    max_value=500,
-    value=50
-)
+# ==============================
+# Prediction
+# ==============================
+if submit:
+    input_data = {
+        "lead_time": lead_time,
+        "adr": adr,
+        "total_of_special_requests": total_special_requests,
+        "previous_cancellations": previous_cancellations
+    }
 
-adr = st.number_input(
-    "ADR (giá trung bình mỗi đêm)",
-    min_value=0.0,
-    max_value=1000.0,
-    value=100.0
-)
+    df_input = pd.DataFrame([input_data])
 
-total_of_special_requests = st.slider(
-    "Số yêu cầu đặc biệt",
-    min_value=0,
-    max_value=5,
-    value=1
-)
+    # align columns
+    df_input = df_input.reindex(columns=columns, fill_value=0)
 
-previous_cancellations = st.slider(
-    "Số lần hủy trước đây",
-    min_value=0,
-    max_value=10,
-    value=0
-)
+    prediction = model.predict(df_input)[0]
+    prob = model.predict_proba(df_input)[0][1]
 
-required_car_parking_spaces = st.slider(
-    "Số chỗ đỗ xe yêu cầu",
-    min_value=0,
-    max_value=5,
-    value=0
-)
-
-market_segment = st.selectbox(
-    "Market segment",
-    ["Online TA", "Offline TA/TO", "Direct", "Corporate", "Groups", "Complementary", "Aviation"]
-)
-
-customer_type = st.selectbox(
-    "Customer type",
-    ["Transient", "Transient-Party", "Contract", "Group"]
-)
-
-assigned_room_type = st.selectbox(
-    "Assigned room type",
-    ["A", "B", "C", "D", "E", "F", "G", "H", "I", "K"]
-)
-
-st.divider()
-
-# =====================================
-# CREATE INPUT DATAFRAME
-# =====================================
-input_dict = {
-    "lead_time": lead_time,
-    "adr": adr,
-    "total_of_special_requests": total_of_special_requests,
-    "previous_cancellations": previous_cancellations,
-    "required_car_parking_spaces": required_car_parking_spaces,
-    "market_segment": market_segment,
-    "customer_type": customer_type,
-    "assigned_room_type": assigned_room_type
-}
-
-input_df = pd.DataFrame([input_dict])
-
-# One-hot / align columns
-input_df = pd.get_dummies(input_df)
-input_df = input_df.reindex(columns=columns, fill_value=0)
-
-# =====================================
-# PREDICTION
-# =====================================
-if st.button("🔮 Dự đoán"):
-    prob = model.predict_proba(input_df)[0][1]
-    pred = model.predict(input_df)[0]
-
-    st.subheader("📊 Kết quả dự đoán")
-
-    if pred == 1:
-        st.error(f"❌ Khách hàng CÓ KHẢ NĂNG HỦY ĐẶT PHÒNG\n\nXác suất: **{prob:.2%}**")
+    if prediction == 1:
+        st.error(f"❌ Khách hàng CÓ KHẢ NĂNG HỦY (Prob = {prob:.2f})")
     else:
-        st.success(f"✅ Khách hàng KHÔNG CÓ KHẢ NĂNG HỦY\n\nXác suất hủy: **{prob:.2%}**")
-
-st.divider()
-
-st.caption("📌 Mô hình: Random Forest | Dữ liệu: Hotel Booking Demand")
+        st.success(f"✅ Khách hàng KHÔNG HỦY (Prob = {1-prob:.2f})")
