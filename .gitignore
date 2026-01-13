@@ -1,0 +1,19 @@
+# Ignore trained model
+model.pkl
+
+# Ignore cached data
+*.pkl
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Streamlit
+.streamlit/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
